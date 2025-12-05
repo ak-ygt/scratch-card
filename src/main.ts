@@ -1,40 +1,35 @@
-import {Application,Assets,Graphics,Point,RenderTexture,Sprite} from 'pixi.js';
+import {Application,Assets,Graphics,Point,RenderTexture,Sprite, Texture} from 'pixi.js';
 import { initDevtools } from '@pixi/devtools';
+import PixiFps from 'pixi-fps';
 
-(async () => {
+async function init(){
   // Create a new application
   const app = new Application();
   // Initialize the application
   await app.init({ resizeTo: window });
 
   initDevtools({app});
+  const fpsCounter = new PixiFps();
+  app.stage.addChild(fpsCounter);
 
   // Append the application canvas to the document body
   document.body.appendChild(app.canvas);
 
   // prepare circle texture, that will be our brush
-  const brush = new Graphics().circle(0, 0, 50).fill({ color: 0xffffff });
+  const brush = new Graphics().circle(0.5, 0.5, 50).fill({ color: 0xffffff });
 
   // Create a line that will interpolate the drawn points
   const line = new Graphics();
 
-  // Load the textures
-  await Assets.load([
-    'https://pixijs.com/assets/flowerTop.png',
-    'https://pixijs.com/assets/eggHead.png',
-  ]);
+  const black = await Assets.load<Texture>('assets/black.png');
+  const yellow = await Assets.load<Texture>('assets/yellow.png');
 
   const { width, height } = app.screen;
   const stageSize = { width, height };
 
-  const background = Object.assign(
-    Sprite.from('https://pixijs.com/assets/flowerTop.png'),
-    stageSize,
-  );
-  const imageToReveal = Object.assign(
-    Sprite.from('https://pixijs.com/assets/eggHead.png'),
-    stageSize,
-  );
+  const background = Sprite.from(black);
+  const imageToReveal = Sprite.from(yellow);
+
   const renderTexture = RenderTexture.create(stageSize);
   const renderTextureSprite = new Sprite(renderTexture);
 
@@ -44,6 +39,7 @@ import { initDevtools } from '@pixi/devtools';
 
   app.stage.eventMode = 'static';
   app.stage.hitArea = app.screen;
+  app.stage.hitArea = background.boundsArea;
   app.stage
     .on('pointerdown', pointerDown)
     .on('pointerup', pointerUp)
@@ -72,7 +68,7 @@ import { initDevtools } from '@pixi/devtools';
           .clear()
           .moveTo(lastDrawnPoint.x, lastDrawnPoint.y)
           .lineTo(x, y)
-          .stroke({ width: 100, color: 0xffffff });
+          .stroke({ width: 10, color: 0xffffff });
         app.renderer.render({
           container: line,
           target: renderTexture,
@@ -97,20 +93,23 @@ import { initDevtools } from '@pixi/devtools';
     lastDrawnPoint = null;
   }
 
-  function getScratchPercentage(){
+  async function getScratchPercentage(){
     let w = background.width;
     let h = background.height;
     let totalpixels = w * h;
     let traparentPixels = 0;
 
-    let pixels = app.renderer.extract.pixels(background).pixels;
+    let  pixels = app.renderer.extract.pixels(background).pixels;
 
-    for (let index = 0; index < totalpixels * 4; index+=4) {
+    for (let index = 0; index < pixels.length; index+=4) {
       let alpha = pixels[index + 3];
-      console.log(alpha);
-      if (alpha < 10) traparentPixels++
+      //console.log("index, Alpha: ", index, alpha);
+      if (alpha == 255) traparentPixels++
     }
 
-    console.log( traparentPixels/totalpixels * 100)
+    //console.log(pixels, totalpixels, traparentPixels);
+    console.log( "Percentage: ", traparentPixels/totalpixels * 100)
   }
-})();
+}
+
+init();
