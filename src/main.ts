@@ -99,7 +99,7 @@ async function init(){
     let totalpixels = w * h;
     let traparentPixels = 0;
 
-    let  pixels = app.renderer.extract.pixels(background).pixels;
+    let  pixels = app.renderer.extract.pixels(imageToReveal).pixels;
 
     for (let index = 0; index < pixels.length; index+=4) {
       let alpha = pixels[index + 3];
