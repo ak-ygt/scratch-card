@@ -1,16 +1,14 @@
-import {Application,Assets,Graphics,Point,RenderTexture,Sprite, Texture} from 'pixi.js';
+import { Application, Assets, Graphics, Point, RenderTexture, Sprite, Texture} from 'pixi.js';
 import { initDevtools } from '@pixi/devtools';
 import { Stats } from 'pixi-stats';
 
 async function init(){
   // Create a new application
   const app = new Application();
+  initDevtools({app});
   // Initialize the application
   await app.init({ resizeTo: window });
 
-  await initDevtools({app});
-
-  app.ticker.maxFPS = 10;
   new Stats(app.renderer, app.ticker);
 
   // Append the application canvas to the document body
@@ -95,21 +93,44 @@ async function init(){
   }
 
   async function getScratchPercentage(){
-    let w = background.width;
-    let h = background.height;
-    let totalpixels = w * h;
-    let traparentPixels = 0;
+    // let w = background.width;
+    // let h = background.height;
+    // let totalpixels = w * h;
+    // let traparentPixels = 0;
 
-    let  pixels = app.renderer.extract.pixels(imageToReveal).pixels;
+    // let  pixels = app.renderer.extract.pixels(imageToReveal).pixels;
 
-    for (let index = 0; index < pixels.length; index+=4) {
-      let alpha = pixels[index + 3];
-      //console.log("index, Alpha: ", index, alpha);
-      if (alpha == 255) traparentPixels++
-    }
+    // for (let index = 0; index < pixels.length; index+=4) {
+    //   let alpha = pixels[index + 3];
+    //   //console.log("index, Alpha: ", index, alpha);
+    //   if (alpha == 255) traparentPixels++
+    // }
+    
+    // //console.log(pixels, totalpixels, traparentPixels);
+    // console.log( "Percentage: ", traparentPixels/totalpixels * 100)
+    let gridX = 30;
+    let gridY = 30;
+    let rt = renderTexture;
+    const renderer = app.renderer;
+    let cleared = 0;
+    let total = gridX * gridY;
 
-    //console.log(pixels, totalpixels, traparentPixels);
-    console.log( "Percentage: ", traparentPixels/totalpixels * 100)
+    const pixel = new Uint8Array(4); // RGBA
+
+    for (let i = 0; i < gridX; i++) {
+        for (let j = 0; j < gridY; j++) {
+
+            const x = Math.floor((i + 0.5) * rt.width / gridX);
+            const y = Math.floor((j + 0.5) * rt.height / gridY);
+
+            //renderer.renderTexture.getPixels(pixel, x, y, 1, 1);
+            imageToReveal.
+            const alpha = pixel[3]; // last value = alpha
+
+            if (alpha === 0) cleared++;
+        }
+    }   
+    return (cleared / total) * 100;
   }
 }
 
