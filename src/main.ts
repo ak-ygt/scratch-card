@@ -1,6 +1,6 @@
 import {Application,Assets,Graphics,Point,RenderTexture,Sprite, Texture} from 'pixi.js';
 import { initDevtools } from '@pixi/devtools';
-import PixiFps from 'pixi-fps';
+import { Stats } from 'pixi-stats';
 
 async function init(){
   // Create a new application
@@ -8,9 +8,10 @@ async function init(){
   // Initialize the application
   await app.init({ resizeTo: window });
 
-  initDevtools({app});
-  const fpsCounter = new PixiFps();
-  app.stage.addChild(fpsCounter);
+  await initDevtools({app});
+
+  app.ticker.maxFPS = 10;
+  new Stats(app.renderer, app.ticker);
 
   // Append the application canvas to the document body
   document.body.appendChild(app.canvas);
