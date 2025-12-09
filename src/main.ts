@@ -1,4 +1,6 @@
-import { Application, Assets, Graphics, Point, RenderTexture, Sprite, Texture} from 'pixi.js';
+import { Application, Assets, Graphics, Point, 
+  Rectangle, 
+  RenderTexture, Sprite, Texture} from 'pixi.js';
 import { initDevtools } from '@pixi/devtools';
 import { Stats } from 'pixi-stats';
 
@@ -23,8 +25,8 @@ async function init(){
   const black = await Assets.load<Texture>('assets/black.png');
   const yellow = await Assets.load<Texture>('assets/yellow.png');
 
-  const { width, height } = app.screen;
-  const stageSize = { width, height };
+  //const { width, height } = app.screen;
+  const stageSize = { width: 256, height: 256 };
 
   const background = Sprite.from(black);
   const imageToReveal = Sprite.from(yellow);
@@ -92,45 +94,73 @@ async function init(){
     lastDrawnPoint = null;
   }
 
-  async function getScratchPercentage(){
-    // let w = background.width;
-    // let h = background.height;
-    // let totalpixels = w * h;
-    // let traparentPixels = 0;
+  // // brute force, calculating alpha for all pixels at once
+  // async function getScratchPercentage(){
+  //   let w = background.width;
+  //   let h = background.height;
+  //   let totalpixels = w * h;
+  //   let traparentPixels = 0;
 
-    // let  pixels = app.renderer.extract.pixels(imageToReveal).pixels;
+  //   let  pixels = app.renderer.extract.pixels(imageToReveal).pixels;
 
-    // for (let index = 0; index < pixels.length; index+=4) {
-    //   let alpha = pixels[index + 3];
-    //   //console.log("index, Alpha: ", index, alpha);
-    //   if (alpha == 255) traparentPixels++
-    // }
+  //   for (let index = 0; index < pixels.length; index+=4) {
+  //     let alpha = pixels[index + 3];
+  //     // console.log("index, Alpha: ", index, alpha);
+  //     if (alpha == 255) traparentPixels++
+  //   }
     
-    // //console.log(pixels, totalpixels, traparentPixels);
-    // console.log( "Percentage: ", traparentPixels/totalpixels * 100)
-    let gridX = 30;
-    let gridY = 30;
-    let rt = renderTexture;
-    const renderer = app.renderer;
+  //   //console.log(pixels, totalpixels, traparentPixels);
+  //   console.log( "Percentage: ", traparentPixels/totalpixels * 100)
+  // }
+
+  // FPS drops to 42
+  async function getScratchPercentage(){
+    let gridX = 5;
+    let gridY = 5;
+    // make sure this is mask/layer
+    let rt = renderTextureSprite;
+
     let cleared = 0;
     let total = gridX * gridY;
-
-    const pixel = new Uint8Array(4); // RGBA
 
     for (let i = 0; i < gridX; i++) {
         for (let j = 0; j < gridY; j++) {
 
+            // ... inside the inner loop ...
+            // Calculate the intended center point of the grid cell
             const x = Math.floor((i + 0.5) * rt.width / gridX);
             const y = Math.floor((j + 0.5) * rt.height / gridY);
 
-            //renderer.renderTexture.getPixels(pixel, x, y, 1, 1);
-            imageToReveal.
-            const alpha = pixel[3]; // last value = alpha
+            // NOTE: You should also check if the 2x2 frame extends past the right/bottom edge.
+            // For example, if rt.width is 100, xSafe must be <= 98.
+            const frameWidth = 2;
+            const frameHeight = 2;
 
-            if (alpha === 0) cleared++;
+            // Clamp the starting position so the frame is fully inside
+            const xFinal = Math.min(x, rt.width - frameWidth);
+            const yFinal = Math.min(y, rt.height - frameHeight);
+
+            // 4. Extract pixel data using the safe, correctly positioned frame
+            const pixeldata = app.renderer.extract.pixels({
+                target: renderTextureSprite, 
+                // make sure this is mask/layer
+                frame: new Rectangle(xFinal, yFinal, frameWidth, frameHeight)
+            });
+
+            let traparentPixels = 0;
+            for (let index = 0; index < pixeldata.pixels.length; index+=4) {
+                  let alpha = pixeldata.pixels[index + 3];
+                  //console.log("index, Alpha: ", index, alpha);
+                  if (alpha > 200) traparentPixels++
+            }
+            //console.log(xFinal, yFinal, traparentPixels/4 * 100);
+         
+            if (traparentPixels/4 > 0.75) 
+            cleared++; 
+          // }
         }
     }   
-    return (cleared / total) * 100;
+    console.log( "Percentage: ", (cleared / total) * 100);
   }
 }
 
