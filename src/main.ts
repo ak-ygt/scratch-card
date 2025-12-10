@@ -113,28 +113,25 @@ async function init(){
   //   console.log( "Percentage: ", traparentPixels/totalpixels * 100)
   // }
 
-  // FPS drops to 42
   async function getScratchPercentage(){
     let gridX = 5;
     let gridY = 5;
     // make sure this is mask/layer
     let rt = renderTextureSprite;
 
+    // if rt.width is 100, xSafe must be <= 98.
+    const frameWidth = 2;
+    const frameHeight = 2;
+    const totalFramePixels = frameHeight*frameHeight;
+
     let cleared = 0;
     let total = gridX * gridY;
 
     for (let i = 0; i < gridX; i++) {
         for (let j = 0; j < gridY; j++) {
-
-            // ... inside the inner loop ...
             // Calculate the intended center point of the grid cell
             const x = Math.floor((i + 0.5) * rt.width / gridX);
             const y = Math.floor((j + 0.5) * rt.height / gridY);
-
-            // NOTE: You should also check if the 2x2 frame extends past the right/bottom edge.
-            // For example, if rt.width is 100, xSafe must be <= 98.
-            const frameWidth = 2;
-            const frameHeight = 2;
 
             // Clamp the starting position so the frame is fully inside
             const xFinal = Math.min(x, rt.width - frameWidth);
@@ -142,8 +139,7 @@ async function init(){
 
             // 4. Extract pixel data using the safe, correctly positioned frame
             const pixeldata = app.renderer.extract.pixels({
-                target: renderTextureSprite, 
-                // make sure this is mask/layer
+                target: renderTextureSprite, // make sure this is mask/layer
                 frame: new Rectangle(xFinal, yFinal, frameWidth, frameHeight)
             });
 
@@ -153,11 +149,8 @@ async function init(){
                   //console.log("index, Alpha: ", index, alpha);
                   if (alpha > 200) traparentPixels++
             }
-            //console.log(xFinal, yFinal, traparentPixels/4 * 100);
          
-            if (traparentPixels/4 > 0.75) 
-            cleared++; 
-          // }
+            if (traparentPixels/totalFramePixels > 0.75) cleared++; 
         }
     }   
     console.log( "Percentage: ", (cleared / total) * 100);
