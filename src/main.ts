@@ -26,7 +26,7 @@ async function init(){
   const yellow = await Assets.load<Texture>('assets/yellow.png');
 
   //const { width, height } = app.screen;
-  const stageSize = { width: 256, height: 256 };
+  const stageSize = { width: black.width, height: black.height };
 
   const background = Sprite.from(black);
   const imageToReveal = Sprite.from(yellow);
@@ -79,6 +79,7 @@ async function init(){
       }
       lastDrawnPoint = lastDrawnPoint || new Point();
       lastDrawnPoint.set(x, y);
+      markCellAsDirty(x,y);
       getScratchPercentage();
       //if (getScratchPercentage()>10) console.log("DONE");
     }
@@ -94,28 +95,32 @@ async function init(){
     lastDrawnPoint = null;
   }
 
-  // // brute force, calculating alpha for all pixels at once
-  // async function getScratchPercentage(){
-  //   let w = background.width;
-  //   let h = background.height;
-  //   let totalpixels = w * h;
-  //   let traparentPixels = 0;
-
-  //   let  pixels = app.renderer.extract.pixels(imageToReveal).pixels;
-
-  //   for (let index = 0; index < pixels.length; index+=4) {
-  //     let alpha = pixels[index + 3];
-  //     // console.log("index, Alpha: ", index, alpha);
-  //     if (alpha == 255) traparentPixels++
-  //   }
-    
-  //   //console.log(pixels, totalpixels, traparentPixels);
-  //   console.log( "Percentage: ", traparentPixels/totalpixels * 100)
-  // }
-
+  // brute force, calculating alpha for all pixels at once
+  /*
   async function getScratchPercentage(){
-    let gridX = 5;
-    let gridY = 5;
+    let w = background.width;
+    let h = background.height;
+    let totalpixels = w * h;
+    let traparentPixels = 0;
+
+    let  pixels = app.renderer.extract.pixels(imageToReveal).pixels;
+
+    for (let index = 0; index < pixels.length; index+=4) {
+      let alpha = pixels[index + 3];
+      // console.log("index, Alpha: ", index, alpha);
+      if (alpha == 255) traparentPixels++
+    }
+    
+    //console.log(pixels, totalpixels, traparentPixels);
+    console.log( "Percentage: ", traparentPixels/totalpixels * 100)
+  }*/
+
+  // Whole texture is broken into grids of 5x5 here, 
+  // a 2x2 rectangle is chosen from each grid to see if it is scratched
+  /*
+  async function getScratchPercentage(){
+    let gridX = 50;
+    let gridY = 50;
     // make sure this is mask/layer
     let rt = renderTextureSprite;
 
@@ -154,6 +159,100 @@ async function init(){
         }
     }   
     console.log( "Percentage: ", (cleared / total) * 100);
+  }*/
+
+  
+  const GRID_X = 10;
+  const GRID_Y = 10;
+  const TOTAL_CELLS = GRID_X * GRID_Y;
+
+  // Start all cells as dirty to force an initial calculation (dirty)
+  let DirtyGridMap = Array(GRID_Y).fill(0).map(() => Array(GRID_X).fill(true)); 
+
+  // Initialize the state maps with 'false' (not scratched)
+  let ScratchStatusMap = Array(GRID_Y).fill(0).map(() => Array(GRID_X).fill(false));
+  
+  function markCellAsDirty(globalX: number, globalY: number) {
+    const rt = renderTexture;
+
+    // 1. Calculate the grid index (i, j) based on the input coordinates
+    const i = Math.floor(globalX / (rt.width / GRID_X));
+    const j = Math.floor(globalY / (rt.height / GRID_Y));
+
+    // 2. Ensure indices are within bounds
+    if (i >= 0 && i < GRID_X && j >= 0 && j < GRID_Y) {
+        // 3. Set the dirty flag
+        DirtyGridMap[j][i] = true;
+    }
+  } 
+
+  async function getScratchPercentage() {
+    // Parameters (Match your current setup)
+    const rt = renderTexture;
+    const CELL_CLEARANCE_PERCENTAGE = 0.75;
+
+    // if rt.width is 100, xSafe must be <= 98.
+    const frameWidth = 2;
+    const frameHeight = 2;
+    
+    // --- 1. Iterate through the Dirty Grid Map ---
+    //5x5 here
+    for (let j = 0; j < GRID_Y; j++) {
+        for (let i = 0; i < GRID_X; i++) {
+
+            // Check if the cell has been modified since the last check
+            if (DirtyGridMap[j][i] === true) {
+                
+                // 2. Coordinate Calculation 
+                const xCenter = Math.floor((i + 0.5) * rt.width / GRID_X);
+                const yCenter = Math.floor((j + 0.5) * rt.height / GRID_Y);
+                const xFinal = Math.min(Math.max(0, xCenter - 1), rt.width - frameWidth);
+                const yFinal = Math.min(Math.max(0, yCenter - 1), rt.height - frameHeight);
+
+                // --- 3. Pixel Extraction 
+                
+                // Render the texture 
+                const pixeldata = app.renderer.extract.pixels({
+                    target: renderTextureSprite, // make sure this is mask/layer
+                    frame: new Rectangle(xFinal, yFinal, frameWidth, frameHeight)
+                });
+
+                // 4. Extract pixel data using the safe, correctly positioned frame
+                let traparentPixels = 0;
+                for (let index = 0; index < pixeldata.pixels.length; index+=4) {
+                      let alpha = pixeldata.pixels[index + 3];
+                      //console.log("index, Alpha: ", index, alpha);
+                      if (alpha > 200) traparentPixels++
+                }
+                
+                let isCellCleared = false; // Assume not cleared initially
+
+               
+            if (traparentPixels/TOTAL_CELLS > CELL_CLEARANCE_PERCENTAGE) 
+              isCellCleared = true;
+                
+            // --- 4. Update State and Clear Flag ---
+            
+            // Update the persistent scratch status for this cell
+            ScratchStatusMap[j][i] = isCellCleared;
+
+            // Mark the cell as clean (no longer needs recalculation)
+            DirtyGridMap[j][i] = false;
+            }
+        }
+    }   
+    
+    // --- 5. Final Tally ---
+    
+    // Count all cells marked as cleared in the status map
+    let clearedCellsCount = ScratchStatusMap.flat().filter(status => status === true).length;
+
+    let percentage = (clearedCellsCount / TOTAL_CELLS) * 100;
+
+    console.log( `Cleared Cells: ${clearedCellsCount}/${TOTAL_CELLS}`);
+    console.log( "Percentage: ", percentage.toFixed(2) + "%");
+    
+    return percentage;
   }
 }
 
