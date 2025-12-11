@@ -69,7 +69,7 @@ async function init(){
           .clear()
           .moveTo(lastDrawnPoint.x, lastDrawnPoint.y)
           .lineTo(x, y)
-          .stroke({ width: 10, color: 0xffffff });
+          .stroke({ width: 100, color: 0xffffff });
         app.renderer.render({
           container: line,
           target: renderTexture,
