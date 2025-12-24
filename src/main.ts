@@ -1,6 +1,6 @@
 import { Application, Assets, Graphics, Point, 
   Rectangle, 
-  RenderTexture, Sprite, Texture} from 'pixi.js';
+  RenderTexture, Sprite, Texture, Text} from 'pixi.js';
 import { initDevtools } from '@pixi/devtools';
 import { Stats } from 'pixi-stats';
 
@@ -17,7 +17,8 @@ async function init(){
   document.body.appendChild(app.canvas);
 
   // prepare circle texture, that will be our brush
-  const brush = new Graphics().circle(0.5, 0.5, 50).fill({ color: 0xffffff });
+  const brushRadius = 5;
+  const brush = new Graphics().circle(0.5, 0.5, brushRadius).fill({ color: 0xffffff });
 
   // Create a line that will interpolate the drawn points
   const line = new Graphics();
@@ -47,10 +48,24 @@ async function init(){
     .on('pointerupoutside', pointerUp)
     .on('pointermove', pointerMove);
 
+  const text = new Text({
+      text: 'Scratch Here!',
+      style: {
+            fontFamily: 'Arial',
+            fontSize: 32,
+            fill: '#ffffff',
+        },
+    });
+  text.anchor.set(0.5, 0.5);
+  app.stage.addChild(text);
+  
+  text.x = background.width/2;
+  text.y = background.height/2;
+
   let dragging = false;
   let lastDrawnPoint: Point | null = null;
 
-  function pointerMove(event : any){
+  async function pointerMove(event : any){
     let x = event.global.x;
     let y = event.global.y;
     if (dragging) {
@@ -69,7 +84,7 @@ async function init(){
           .clear()
           .moveTo(lastDrawnPoint.x, lastDrawnPoint.y)
           .lineTo(x, y)
-          .stroke({ width: 100, color: 0xffffff });
+          .stroke({ width: brushRadius*2, color: 0xffffff });
         app.renderer.render({
           container: line,
           target: renderTexture,
@@ -80,8 +95,11 @@ async function init(){
       lastDrawnPoint = lastDrawnPoint || new Point();
       lastDrawnPoint.set(x, y);
       markCellAsDirty(x,y);
-      getScratchPercentage();
-      //if (getScratchPercentage()>10) console.log("DONE");
+      const percentage = await getScratchPercentage();
+    
+      if (percentage > 1) { // Hide after 5% is scratched
+          text.visible = false;
+      }
     }
   }
 
@@ -101,18 +119,18 @@ async function init(){
     let w = background.width;
     let h = background.height;
     let totalpixels = w * h;
-    let traparentPixels = 0;
+    let transparentPixels = 0;
 
     let  pixels = app.renderer.extract.pixels(imageToReveal).pixels;
 
     for (let index = 0; index < pixels.length; index+=4) {
       let alpha = pixels[index + 3];
       // console.log("index, Alpha: ", index, alpha);
-      if (alpha == 255) traparentPixels++
+      if (alpha == 255) transparentPixels++
     }
     
-    //console.log(pixels, totalpixels, traparentPixels);
-    console.log( "Percentage: ", traparentPixels/totalpixels * 100)
+    //console.log(pixels, totalpixels, transparentPixels);
+    console.log( "Percentage: ", transparentPixels/totalpixels * 100)
   }*/
 
   // Whole texture is broken into grids of 5x5 here, 
@@ -148,14 +166,14 @@ async function init(){
                 frame: new Rectangle(xFinal, yFinal, frameWidth, frameHeight)
             });
 
-            let traparentPixels = 0;
+            let transparentPixels = 0;
             for (let index = 0; index < pixeldata.pixels.length; index+=4) {
                   let alpha = pixeldata.pixels[index + 3];
                   //console.log("index, Alpha: ", index, alpha);
-                  if (alpha > 200) traparentPixels++
+                  if (alpha > 200) transparentPixels++
             }
          
-            if (traparentPixels/totalFramePixels > 0.75) cleared++; 
+            if (transparentPixels/totalFramePixels > 0.75) cleared++; 
         }
     }   
     console.log( "Percentage: ", (cleared / total) * 100);
@@ -183,6 +201,7 @@ async function init(){
     if (i >= 0 && i < GRID_X && j >= 0 && j < GRID_Y) {
         // 3. Set the dirty flag
         DirtyGridMap[j][i] = true;
+        console.log("GRID ", i," ", j, " is dirty");
     }
   } 
 
@@ -218,42 +237,47 @@ async function init(){
                 });
 
                 // 4. Extract pixel data using the safe, correctly positioned frame
-                let traparentPixels = 0;
+                let transparentPixels = 0;
                 for (let index = 0; index < pixeldata.pixels.length; index+=4) {
                       let alpha = pixeldata.pixels[index + 3];
-                      //console.log("index, Alpha: ", index, alpha);
-                      if (alpha > 200) traparentPixels++
+                      console.log("index, Alpha: ", index, alpha);
+                      if (alpha > 200) transparentPixels++
                 }
                 
                 let isCellCleared = false; // Assume not cleared initially
+                console.log(transparentPixels, 4);
 
                
-            if (traparentPixels/TOTAL_CELLS > CELL_CLEARANCE_PERCENTAGE) 
+            if (transparentPixels/4 > CELL_CLEARANCE_PERCENTAGE) 
               isCellCleared = true;
                 
             // --- 4. Update State and Clear Flag ---
             
             // Update the persistent scratch status for this cell
+            if (ScratchStatusMap[j][i] == false)
             ScratchStatusMap[j][i] = isCellCleared;
 
             // Mark the cell as clean (no longer needs recalculation)
             DirtyGridMap[j][i] = false;
             }
         }
-    }   
+    }  
     
     // --- 5. Final Tally ---
     
     // Count all cells marked as cleared in the status map
+    console.log(ScratchStatusMap);
     let clearedCellsCount = ScratchStatusMap.flat().filter(status => status === true).length;
 
-    let percentage = (clearedCellsCount / TOTAL_CELLS) * 100;
+    let percentage = Math.floor((clearedCellsCount / TOTAL_CELLS) * 100);
 
     console.log( `Cleared Cells: ${clearedCellsCount}/${TOTAL_CELLS}`);
-    console.log( "Percentage: ", percentage.toFixed(2) + "%");
+    console.log( "Percentage: ", percentage + "%");
     
     return percentage;
   }
+
+  
 }
 
 init();
