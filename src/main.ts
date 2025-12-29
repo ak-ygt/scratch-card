@@ -1,4 +1,4 @@
-import { Application, Assets, Graphics, Point, 
+import { Application, Assets, Point, 
   Rectangle, 
   RenderTexture, Sprite, Texture, Text} from 'pixi.js';
 import { initDevtools } from '@pixi/devtools';
@@ -17,11 +17,24 @@ async function init(){
   document.body.appendChild(app.canvas);
 
   // prepare circle texture, that will be our brush
-  const brushRadius = 5;
-  const brush = new Graphics().circle(0.5, 0.5, brushRadius).fill({ color: 0xffffff });
+  //const brushRadius = 5;
+  //const brush = new Graphics().circle(0.5, 0.5, brushRadius).fill({ color: 0xffffff });
+
+  // try a polygon brush
+  //const brush = new Graphics().poly([0], true).fill({ color: 0xffffff });
+  //const brush = new Graphics().regularPoly(0.5,0.5, brushRadius, brushRadius).fill({ color: 0xffffff });
+  //const brush = new Graphics().roundPoly(0.5,0.5, brushRadius, 6, 5, 45).fill({ color: 0xffffff });
+
+  // try rectangle brush
+  //const brush = new Graphics().rect(0.5,0.5,brushRadius, brushRadius).fill({ color: 0xffffff });
+
+  // custom texture as brush
+  const bunny = await Assets.load<Texture>('assets/bunny.png');
+  const brush = Sprite.from(bunny);
+  brush.anchor.set(0.5,0.5);
 
   // Create a line that will interpolate the drawn points
-  const line = new Graphics();
+  //const line = new Graphics();
 
   const black = await Assets.load<Texture>('assets/black.png');
   const yellow = await Assets.load<Texture>('assets/yellow.png');
@@ -58,7 +71,7 @@ async function init(){
     });
   text.anchor.set(0.5, 0.5);
   app.stage.addChild(text);
-  
+
   text.x = background.width/2;
   text.y = background.height/2;
 
@@ -66,45 +79,28 @@ async function init(){
   let lastDrawnPoint: Point | null = null;
 
   async function pointerMove(event : any){
+    if (!dragging) return 
+
     let x = event.global.x;
     let y = event.global.y;
-    if (dragging) {
-      brush.position.set(x, y);
-      app.renderer.render({
-        container: brush,
-        target: renderTexture,
-        clear: false,
-        //skipUpdateTransform: false,
-      });
-      // Smooth out the drawing a little bit to make it look nicer
-      // this connects the previous drawn point to the current one
-      // using a line
-      if (lastDrawnPoint) {
-        line
-          .clear()
-          .moveTo(lastDrawnPoint.x, lastDrawnPoint.y)
-          .lineTo(x, y)
-          .stroke({ width: brushRadius*2, color: 0xffffff });
-        app.renderer.render({
-          container: line,
-          target: renderTexture,
-          clear: false,
-          //skipUpdateTransform: false,
-        });
-      }
-      lastDrawnPoint = lastDrawnPoint || new Point();
-      lastDrawnPoint.set(x, y);
-      markCellAsDirty(x,y);
-      const percentage = await getScratchPercentage();
-    
-      if (percentage > 1) { // Hide after 5% is scratched
-          text.visible = false;
-      }
+
+    scratch(x,y);
+    markCellAsDirty(x,y);
+    const percentage = await getScratchPercentage();
+  
+    if (percentage > 1) { // Hide after 5% is scratched
+        text.visible = false;
+    }
+
+    if (percentage > 90) {
+      console.log("Scratching Completed!!")
     }
   }
 
-  function pointerDown(event:any) {
+  function pointerDown(event: any) {
     dragging = true;
+    // Properly create a Point object instead of a plain object to fulfill the type requirement
+    lastDrawnPoint = new Point(event.global.x, event.global.y);
     pointerMove(event);
   }
 
@@ -112,6 +108,33 @@ async function init(){
     dragging = false;
     lastDrawnPoint = null;
   }
+
+  function scratch(x: number, y:number ) {
+    if (!lastDrawnPoint) return 
+
+    const dist = Math.hypot(x - lastDrawnPoint.x, y - lastDrawnPoint.y);
+    const angle = Math.atan2(y - lastDrawnPoint.y, x - lastDrawnPoint.x);
+
+    // Stamp the brush every 5 pixels along the move path
+    for (let i = 0; i < dist; i += 5) {
+        const x = lastDrawnPoint.x + Math.cos(angle) * i;
+        const y = lastDrawnPoint.y + Math.sin(angle) * i;
+        
+        brush.position.set(x, y);
+        brush.rotation = Math.random() * Math.PI * 2;
+        brush.scale.set(0.5+Math.random()*0.4); // randomly varies 
+
+        app.renderer.render({
+          container: brush,
+          target: renderTexture,
+          clear: false,
+          //skipUpdateTransform: false,
+        });
+    }
+    
+    lastDrawnPoint.x = x;
+    lastDrawnPoint.y = y;
+  } 
 
   // brute force, calculating alpha for all pixels at once
   /*
