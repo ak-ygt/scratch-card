@@ -45,24 +45,21 @@ async function init(){
   const black = await Assets.load<Texture>('assets/black.png');
   const yellow = await Assets.load<Texture>('assets/yellow.png');
 
-  // Calculate scale to fit within viewport
-  const maxWidth = app.screen.width;
-  const maxHeight = app.screen.height;
-  const scaleX = maxWidth / black.width;
-  const scaleY = maxHeight / black.height;
-  const scale = Math.min(scaleX, scaleY); // Scale to fit viewport (can scale up or down)
+  // Fixed scale - change this value to adjust the scratch card size
+  // 1.0 = original size, 0.5 = half size, 2.0 = double size, etc.
+  const FIXED_SCALE = 1.0;
 
   const stageSize = { 
-    width: black.width * scale, 
-    height: black.height * scale 
+    width: black.width * FIXED_SCALE, 
+    height: black.height * FIXED_SCALE 
   };
 
   const background = Sprite.from(black);
   const imageToReveal = Sprite.from(yellow);
 
-  // Scale sprites to fit viewport
-  background.scale.set(scale);
-  imageToReveal.scale.set(scale);
+  // Apply fixed scale to maintain aspect ratio
+  background.scale.set(FIXED_SCALE);
+  imageToReveal.scale.set(FIXED_SCALE);
 
   // Center the sprites
   background.x = (app.screen.width - stageSize.width) / 2;
