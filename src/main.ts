@@ -111,6 +111,8 @@ async function init(){
 
   let dragging = false;
   let lastDrawnPoint: Point | null = null;
+
+  // throttling the getScratchPercentage function to once in 100ms
   let lastPercentage = 0;
   let lastPercentageUpdateTime = 0;
   const PERCENTAGE_UPDATE_INTERVAL = 100; // ms
@@ -123,7 +125,11 @@ async function init(){
 
     scratch(x, y);
     markCellAsDirty(event.global.x, event.global.y);
-
+    // Throttling in JavaScript is a technique that 
+    // limits the execution of a function to at most 
+    // once within a specified time interval, even if 
+    // the event triggering it fires multiple times 
+    // in quick succession
     const now = performance.now();
     // Throttle expensive percentage calculation
     if (now - lastPercentageUpdateTime >= PERCENTAGE_UPDATE_INTERVAL) {
