@@ -111,8 +111,11 @@ async function init(){
 
   let dragging = false;
   let lastDrawnPoint: Point | null = null;
+  let lastPercentage = 0;
+  let lastPercentageUpdateTime = 0;
+  const PERCENTAGE_UPDATE_INTERVAL = 100; // ms
 
-  async function pointerMove(event : any){
+  function pointerMove(event : any){
     if (!dragging) return 
 
     let x = event.global.x - background.x;
@@ -120,19 +123,21 @@ async function init(){
 
     scratch(x, y);
     markCellAsDirty(event.global.x, event.global.y);
-    const percentage = await getScratchPercentage();
-  
-    text.text = `Scratched: ${percentage}%`;
-  
-    // Optional: Keep the text centered if the content length changes significantly
-    text.anchor.set(0.5, 0.5); 
 
-    if (percentage > 1) { 
+    const now = performance.now();
+    // Throttle expensive percentage calculation
+    if (now - lastPercentageUpdateTime >= PERCENTAGE_UPDATE_INTERVAL) {
+      lastPercentage = getScratchPercentage();
+      lastPercentageUpdateTime = now;
+      text.text = `Scratched: ${lastPercentage}%`;
+    }
+  
+    if (lastPercentage > 1) { 
         // Instead of hiding it at 1%, you might want to wait until it's finished
         // or remove this block so the percentage stays visible.
     }
 
-    if (percentage > 80) {
+    if (lastPercentage > 80) {
       console.log("Scratching Completed!!");
 
       // Remove the mask to reveal the full image instantly
@@ -259,6 +264,8 @@ async function init(){
   
   const GRID_X = 10;
   const GRID_Y = 10;
+  const CELL_WIDTH = renderTexture.width / GRID_X;
+  const CELL_HEIGHT = renderTexture.height / GRID_Y;
   const TOTAL_CELLS = GRID_X * GRID_Y;
 
   // Start all cells as dirty to force an initial calculation (dirty)
@@ -268,8 +275,6 @@ async function init(){
   let ScratchStatusMap = Array(GRID_Y).fill(0).map(() => Array(GRID_X).fill(false));
   
   function markCellAsDirty(globalX: number, globalY: number) {
-    const rt = renderTexture;
-
     // Convert global coordinates to local coordinates relative to background
     const localX = globalX - background.x;
     const localY = globalY - background.y;
@@ -286,10 +291,10 @@ async function init(){
 
     // Convert pixel bounds to grid indices
     // We use floor for the start and ceil for the end to catch every cell the brush touches
-    const startI = Math.floor(startX / (rt.width / GRID_X));
-    const endI = Math.floor(endX / (rt.width / GRID_X));
-    const startJ = Math.floor(startY / (rt.height / GRID_Y));
-    const endJ = Math.floor(endY / (rt.height / GRID_Y));
+    const startI = Math.floor(startX / CELL_WIDTH);
+    const endI = Math.floor(endX / CELL_WIDTH);
+    const startJ = Math.floor(startY / CELL_HEIGHT);
+    const endJ = Math.floor(endY / CELL_HEIGHT);
 
     // Loop through all cells covered by the brush bounds
     for (let j = startJ; j <= endJ; j++) {
@@ -303,7 +308,7 @@ async function init(){
     }
   } 
 
-  async function getScratchPercentage() {
+  function getScratchPercentage() {
     // Parameters (Match your current setup)
     const rt = renderTexture;
     const CELL_CLEARANCE_PERCENTAGE = 0.75;
