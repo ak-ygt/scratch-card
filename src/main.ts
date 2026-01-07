@@ -8,7 +8,8 @@ import {
   Texture, 
   Text,
   Container,
-  TilingSprite
+  TilingSprite,
+  BlurFilter
 } from 'pixi.js';
 
 import { initDevtools } from '@pixi/devtools';
@@ -50,10 +51,14 @@ async function init() {
   // ========================================================================
 
   const bgTexture = await Assets.load('assets/looping_bg.png');
+  const backgroundBlur = new BlurFilter({
+    strength: 5
+  });
   const loopingBg = new TilingSprite({
     texture: bgTexture,
     width: app.screen.width,
-    height: app.screen.height
+    height: app.screen.height,
+    filters: backgroundBlur
   });
 
 // ensure index is 0 so that it stays at the bottom
