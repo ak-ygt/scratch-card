@@ -133,27 +133,32 @@ async function init() {
     height: black.height * FIXED_SCALE
   };
 
-  // Create scratch card sprites
+  // Create a container for all scratch card elements
+  const scratchCardContainer = new Container();
+
+  // Create scratch card sprites (in unscaled space)
   const background = Sprite.from(black);
   const imageToReveal = Sprite.from(yellow);
-  background.scale.set(FIXED_SCALE);
-  imageToReveal.scale.set(FIXED_SCALE);
+  // Don't scale individual sprites - container will handle scaling
+  background.scale.set(1);
+  imageToReveal.scale.set(1);
 
-  // Center the sprites
-  background.x = (app.screen.width - stageSize.width) / 2;
-  background.y = (app.screen.height - stageSize.height) / 2;
-  imageToReveal.x = background.x;
-  imageToReveal.y = background.y;
+  // Position sprites at origin (container will handle centering)
+  background.x = 0;
+  background.y = 0;
+  imageToReveal.x = 0;
+  imageToReveal.y = 0;
 
-  // Create render texture for masking (texture resized on demand)
-  let renderTexture = RenderTexture.create(stageSize);
+  // Create render texture for masking (use original texture dimensions, container handles scaling)
+  let renderTexture = RenderTexture.create({ width: black.width, height: black.height });
   const renderTextureSprite = new Sprite(renderTexture);
-  renderTextureSprite.x = background.x;
-  renderTextureSprite.y = background.y;
+  renderTextureSprite.x = 0;
+  renderTextureSprite.y = 0;
   renderTextureSprite.scale.set(1);
   imageToReveal.mask = renderTextureSprite;
 
-  app.stage.addChild(background, imageToReveal, renderTextureSprite);
+  // Add elements to container
+  scratchCardContainer.addChild(background, imageToReveal, renderTextureSprite);
 
   // Setup text overlay
   const text = new Text({
@@ -173,9 +178,17 @@ async function init() {
     },
   });
   text.anchor.set(0.5, 0.5);
-  text.x = background.x + stageSize.width / 2;
-  text.y = background.y + stageSize.height / 2;
-  app.stage.addChild(text);
+  text.x = black.width / 2;
+  text.y = black.height / 2;
+  scratchCardContainer.addChild(text);
+
+  // Set initial container scale and position
+  scratchCardContainer.scale.set(FIXED_SCALE);
+  scratchCardContainer.x = (app.screen.width - stageSize.width) / 2;
+  scratchCardContainer.y = (app.screen.height - stageSize.height) / 2;
+
+  // Add container to stage
+  app.stage.addChild(scratchCardContainer);
 
   // Function to update scratch card size on window resize
   function updateScratchCardSize() {
@@ -185,54 +198,32 @@ async function init() {
       height: black.height * newScale
     };
 
-    // Rebuild the render texture to the new size while preserving the mask content
-    const oldRT = renderTexture;
-    const oldRTSprite = new Sprite(oldRT);
-    oldRTSprite.scale.set(newStageSize.width / oldRT.width, newStageSize.height / oldRT.height);
-
-    const newRT = RenderTexture.create(newStageSize);
-    app.renderer.render({
-      container: oldRTSprite,
-      target: newRT,
-      clear: true,
-    });
-
-    renderTexture = newRT;
-    renderTextureSprite.texture = newRT;
-    renderTextureSprite.scale.set(1);
-
     FIXED_SCALE = newScale;
 
-    // Update scales
-    background.scale.set(FIXED_SCALE);
-    imageToReveal.scale.set(FIXED_SCALE);
-    text.scale.set(FIXED_SCALE);
+    // Scale the container instead of individual elements
+    scratchCardContainer.scale.set(FIXED_SCALE);
 
-    // Re-center
-    background.x = (app.screen.width - newStageSize.width) / 2;
-    background.y = (app.screen.height - newStageSize.height) / 2;
-    imageToReveal.x = background.x;
-    imageToReveal.y = background.y;
-    renderTextureSprite.x = background.x;
-    renderTextureSprite.y = background.y;
+    // Re-center the container
+    scratchCardContainer.x = (app.screen.width - newStageSize.width) / 2;
+    scratchCardContainer.y = (app.screen.height - newStageSize.height) / 2;
 
-    // Update text
-    text.x = background.x + newStageSize.width / 2;
-    text.y = background.y + newStageSize.height / 2;
+    // Grid cell sizes remain constant (based on original texture size)
+    // since the container handles scaling
+    CELL_WIDTH = black.width / GRID_X;
+    CELL_HEIGHT = black.height / GRID_Y;
 
-    // Update grid cell sizes to match the new RT dimensions
-    CELL_WIDTH = renderTexture.width / GRID_X;
-    CELL_HEIGHT = renderTexture.height / GRID_Y;
-
-    app.stage.hitArea = background.boundsArea;
+    // Update hit area to match the container's bounds
+    const bounds = scratchCardContainer.getBounds();
+    app.stage.hitArea = new Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
   }
 
   // ========================================================================
   // Grid-based Percentage Calculation
   // ========================================================================
 
-  let CELL_WIDTH = renderTexture.width / GRID_X;
-  let CELL_HEIGHT = renderTexture.height / GRID_Y;
+  // Grid cell sizes based on original texture dimensions (container handles scaling)
+  let CELL_WIDTH = black.width / GRID_X;
+  let CELL_HEIGHT = black.height / GRID_Y;
   const TOTAL_CELLS = GRID_X * GRID_Y;
 
   let DirtyGridMap = Array(GRID_Y).fill(0).map(() => Array(GRID_X).fill(true));
@@ -342,10 +333,9 @@ async function init() {
 
   function pointerDown(event: any) {
     dragging = true;
-    lastDrawnPoint = new Point(
-      event.global.x - background.x,
-      event.global.y - background.y,
-    );
+    // Convert global coordinates to local coordinates within the container
+    const localPoint = scratchCardContainer.toLocal(event.global);
+    lastDrawnPoint = new Point(localPoint.x, localPoint.y);
     pointerMove(event);
   }
 
@@ -357,8 +347,10 @@ async function init() {
   function pointerMove(event: any) {
     if (!dragging) return;
 
-    const localX = event.global.x - background.x;
-    const localY = event.global.y - background.y;
+    // Convert global coordinates to local coordinates within the container
+    const localPoint = scratchCardContainer.toLocal(event.global);
+    const localX = localPoint.x;
+    const localY = localPoint.y;
 
     scratch(localX, localY);
     markCellAsDirty(localX, localY);
@@ -389,7 +381,8 @@ async function init() {
 
   // Setup event listeners
   app.stage.eventMode = 'static';
-  app.stage.hitArea = background.boundsArea;
+  const initialBounds = scratchCardContainer.getBounds();
+  app.stage.hitArea = new Rectangle(initialBounds.x, initialBounds.y, initialBounds.width, initialBounds.height);
   app.stage
     .on('pointerdown', pointerDown)
     .on('pointerup', pointerUp)
@@ -449,7 +442,7 @@ async function init() {
     }
     resizeTimeout = window.setTimeout(() => {
       updateScratchCardSize();
-    }, 150);
+    }, 10);
   });
 
   // ========================================================================
