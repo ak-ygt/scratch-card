@@ -14,16 +14,18 @@ import {
 
 import { initDevtools } from '@pixi/devtools';
 import { Stats } from 'pixi-stats';
+import { Constants } from './constants';
+import { ParticleEffect } from './ParticleEffect';
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const PERCENTAGE_UPDATE_INTERVAL = 100; // ms
-const GRID_X = 10;
-const GRID_Y = 10;
-const CELL_CLEARANCE_PERCENTAGE = 0.75;
-const COMPLETION_THRESHOLD = 80; // percentage
+const PERCENTAGE_UPDATE_INTERVAL = Constants.PERCENTAGE_UPDATE_INTERVAL;
+const GRID_X = Constants.GRID_X;
+const GRID_Y = Constants.GRID_Y;
+const CELL_CLEARANCE_PERCENTAGE = Constants.CELL_CLEARANCE_PERCENTAGE;
+const COMPLETION_THRESHOLD = Constants.COMPLETION_THRESHOLD; // percentage
 
 // ============================================================================
 // Main Initialization
@@ -74,36 +76,9 @@ async function init() {
   // Particle Effects
   // ========================================================================
 
-  const particles: Sprite[] = [];
-  const bunnyTexture = await Assets.load('assets/bunny.png');
-
-  function createExplosion(x: number, y: number) {
-    for (let i = 0; i < 50; i++) {
-      const p = Sprite.from(bunnyTexture);
-      p.anchor.set(0.5);
-      p.x = x;
-      p.y = y;
-      p.scale.set(0.3);
-      (p as any).vx = (Math.random() - 0.5) * 20;
-      (p as any).vy = (Math.random() - 0.5) * 20;
-      app.stage.addChild(p);
-      particles.push(p);
-    }
-  }
-
-  // Update particles
-  app.ticker.add(() => {
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += (p as any).vx;
-      p.y += (p as any).vy;
-      p.alpha -= 0.02;
-      if (p.alpha <= 0) {
-        app.stage.removeChild(p);
-        particles.splice(i, 1);
-      }
-    }
-  });
+  // Particle effect instance for the explosion
+  const particleEffect = new ParticleEffect(app);
+  app.ticker.add(() => particleEffect.update());
 
   // ========================================================================
   // Scratch Card Setup
@@ -304,6 +279,7 @@ async function init() {
   let lastDrawnPoint: Point | null = null;
   let lastPercentage = 0;
   let lastPercentageUpdateTime = 0;
+  let lastScratchEffectTime = 0;
 
   function scratch(x: number, y: number) {
     if (!lastDrawnPoint) return;
@@ -354,9 +330,17 @@ async function init() {
 
     scratch(localX, localY);
     markCellAsDirty(localX, localY);
+    const now = performance.now();
+    if (now - lastScratchEffectTime > 80) {
+      const globalPoint = scratchCardContainer.toGlobal(localPoint);
+      particleEffect.createScratchingEffect(globalPoint.x, globalPoint.y, 5)
+      .catch((error) => {
+        console.error('Error creating scratching effect: ', error);
+      });
+      lastScratchEffectTime = now;
+    }
 
     // Throttle expensive percentage calculation
-    const now = performance.now();
     if (now - lastPercentageUpdateTime >= PERCENTAGE_UPDATE_INTERVAL) {
       lastPercentage = getScratchPercentage();
       lastPercentageUpdateTime = now;
@@ -366,16 +350,19 @@ async function init() {
     if (lastPercentage > COMPLETION_THRESHOLD) {
       console.log("Scratching Completed!!");
 
-      createExplosion(app.screen.width / 2, app.screen.height / 2);
+      particleEffect.createExplosion(app.screen.width / 2, app.screen.height / 2)
+      .then(() => {
+        imageToReveal.mask = null;
+        text.text = "Scratching Completed!";
 
-      imageToReveal.mask = null;
-      text.text = "Scratching Completed!";
-
-      app.stage
-        .off('pointerdown', pointerDown)
-        .off('pointerup', pointerUp)
-        .off('pointerupoutside', pointerUp)
-        .off('pointermove', pointerMove);
+        app.stage
+          .off('pointerdown', pointerDown)
+          .off('pointerup', pointerUp)
+          .off('pointerupoutside', pointerUp)
+          .off('pointermove', pointerMove);
+      }).catch((error) => {
+        console.error('Error creating explosion: ', error);
+      });
     }
   }
 
