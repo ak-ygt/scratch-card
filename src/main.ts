@@ -14,7 +14,7 @@ import {
 
 import { initDevtools } from '@pixi/devtools';
 import { Stats } from 'pixi-stats';
-import { Constants } from './constants';
+import { Constants } from './Constants';
 import { ParticleEffect } from './ParticleEffect';
 
 // ============================================================================
