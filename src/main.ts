@@ -16,6 +16,7 @@ import { initDevtools } from '@pixi/devtools';
 import { Stats } from 'pixi-stats';
 import { Constants } from './Constants';
 import { ParticleEffect } from './ParticleEffect';
+import { createCharacter } from './character';
 
 // ============================================================================
 // Constants
@@ -203,6 +204,7 @@ async function init() {
 
   let DirtyGridMap = Array(GRID_Y).fill(0).map(() => Array(GRID_X).fill(true));
   let ScratchStatusMap = Array(GRID_Y).fill(0).map(() => Array(GRID_X).fill(false));
+  console.log(ScratchStatusMap);
 
   function markCellAsDirty(localX: number, localY: number) {
     // localX/localY are already in unscaled space
@@ -411,6 +413,13 @@ async function init() {
 
     console.log("Game Reset");
   }
+
+  
+  // ========================================================================
+  // Character Animtaion
+  // ========================================================================
+
+  createCharacter(scratchCardContainer, app);
 
   // ========================================================================
   // Window Resize Handler
