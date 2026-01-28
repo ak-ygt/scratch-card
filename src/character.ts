@@ -12,12 +12,12 @@ export async function createCharacter(parent: Container, app: Application) {
     character.play();
 
     
-  character.onComplete = () => console.log('Animation finished!');
+    character.onComplete = () => console.log('Animation finished!');
 
     let speed = 2;
     app.ticker.add((delta) => {
         character.x += speed * delta.deltaTime;
-        if (character.x >= 230 || character.x <= 30) {
+        if (character.x > 230 || character.x <30) {
             speed *= -1;
             character.scale.x = speed > 0 ? 0.3 : -0.3;
         }

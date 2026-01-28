@@ -10,6 +10,7 @@
     "dev": "webpack serve --mode=development"
   },
   "dependencies": {
+    "@esotericsoftware/spine-pixi-v8": "^4.2.98",
     "@pixi/devtools": "^2.0.1",
     "pixi-stats": "^5.0.3",
     "pixi.js": "^8.8.1",

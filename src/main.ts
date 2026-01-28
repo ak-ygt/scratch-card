@@ -17,6 +17,8 @@ import { Stats } from 'pixi-stats';
 import { Constants } from './Constants';
 import { ParticleEffect } from './ParticleEffect';
 import { createCharacter } from './character';
+import { createSpine } from './spineCelestialCircus';
+import { GameHUD } from './gameHUD';
 
 // ============================================================================
 // Constants
@@ -421,6 +423,19 @@ async function init() {
 
   createCharacter(scratchCardContainer, app);
 
+  
+  // ========================================================================
+  // Spine Animtaion
+  // ========================================================================
+
+  createSpine(scratchCardContainer, app);
+
+  // ========================================================================
+  // HUD Assets
+  // ========================================================================
+
+  const hud = new GameHUD(app);
+  await hud.load();
   // ========================================================================
   // Window Resize Handler
   // ========================================================================
